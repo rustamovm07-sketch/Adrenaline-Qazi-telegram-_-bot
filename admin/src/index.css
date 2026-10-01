@@ -1,0 +1,107 @@
+@import "tailwindcss";
+
+:root {
+  font-family:
+    Inter,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+
+  color: #17130e;
+  background: #f6f3ed;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: #f6f3ed;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+[data-theme="dark"] .bg-white,
+[data-theme="dark"] .bg-white\/90 {
+  background-color: #1c1915 !important;
+}
+
+[data-theme="dark"] .bg-\[\#f6f3ed\],
+[data-theme="dark"] .bg-\[\#f6f3ed\]\/90,
+[data-theme="dark"] .bg-\[\#faf8f3\],
+[data-theme="dark"] .bg-gray-50,
+[data-theme="dark"] .bg-gray-100 {
+  background-color: #26221c !important;
+}
+
+[data-theme="dark"] .bg-\[\#f1e5cf\] {
+  background-color: #3a2f1f !important;
+}
+
+[data-theme="dark"] .bg-amber-50 {
+  background-color: #352b1d !important;
+}
+
+[data-theme="dark"] .bg-red-50 {
+  background-color: #3a211e !important;
+}
+
+[data-theme="dark"] .bg-emerald-50 {
+  background-color: #1b3027 !important;
+}
+
+[data-theme="dark"] .text-\[\#17130e\],
+[data-theme="dark"] .text-gray-900,
+[data-theme="dark"] .text-gray-800,
+[data-theme="dark"] .text-gray-700 {
+  color: #f2eadc !important;
+}
+
+[data-theme="dark"] .text-\[\#211a10\] {
+  color: #221b10 !important;
+}
+
+[data-theme="dark"] .text-gray-600,
+[data-theme="dark"] .text-gray-500 {
+  color: #bcb09c !important;
+}
+
+[data-theme="dark"] .text-gray-400 {
+  color: #948977 !important;
+}
+
+[data-theme="dark"] .border-black\/5,
+[data-theme="dark"] .border-gray-200 {
+  border-color: #3e382e !important;
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+  color-scheme: dark;
+  color: #f2eadc;
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: #8d826f;
+}

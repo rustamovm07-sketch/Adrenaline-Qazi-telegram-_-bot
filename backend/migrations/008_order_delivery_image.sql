@@ -1,0 +1,6 @@
+BEGIN;
+
+ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS delivery_image_url VARCHAR(500);
+
+COMMIT;
