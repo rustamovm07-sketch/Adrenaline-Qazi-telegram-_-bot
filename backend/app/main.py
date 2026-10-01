@@ -4,7 +4,7 @@ import os
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values, load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -19,7 +19,8 @@ from .categories import router as categories_router
 from .inventory_routes import router as inventory_router
 from .store_settings import router as store_settings_router
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(ENV_FILE)
 
 Base.metadata.create_all(bind=engine)
 
@@ -67,12 +68,16 @@ app = FastAPI(
 )
 
 
-cors_origins = [
-    origin.strip()
-    for origin in os.getenv(
+cors_origins_value = dotenv_values(ENV_FILE).get("CORS_ORIGINS")
+if cors_origins_value is None:
+    cors_origins_value = os.getenv(
         "CORS_ORIGINS",
         "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174",
-    ).split(",")
+    )
+
+cors_origins = [
+    origin.strip()
+    for origin in cors_origins_value.split(",")
     if origin.strip()
 ]
 

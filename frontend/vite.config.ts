@@ -8,4 +8,12 @@ export default defineConfig(({ mode }) => ({
     react(),
     tailwindcss(),
   ],
+  server: {
+    proxy: {
+      '^/(products|categories|customers|orders|dashboard|inventory|store-settings|uploads|health)(/|$)': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+    },
+  },
 }))
