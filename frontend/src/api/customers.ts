@@ -46,7 +46,7 @@ export interface CustomerProfile {
 }
 
 export interface CustomerProfileCreate {
-  telegram_id: number
+  telegram_id?: number
 
   name: string
   surname: string
@@ -125,15 +125,9 @@ async function parseResponse<T>(
    GET CUSTOMER PROFILE
    ============================================================ */
 
-export async function getCustomerProfile(
-  telegramId: number,
-): Promise<CustomerProfile | null> {
-  if (!Number.isInteger(telegramId) || telegramId <= 0) {
-    throw new Error('Telegram ID noto‘g‘ri.')
-  }
-
+export async function getCustomerProfile(): Promise<CustomerProfile | null> {
   const response = await apiFetch(
-    `${API_BASE_URL}/customers/profile/${telegramId}`,
+    `${API_BASE_URL}/customers/profile/me`,
     {
       method: 'GET',
       headers: {
@@ -157,13 +151,6 @@ export async function getCustomerProfile(
 export async function createCustomerProfile(
   data: CustomerProfileCreate,
 ): Promise<CustomerProfile> {
-  if (
-    !Number.isInteger(data.telegram_id) ||
-    data.telegram_id <= 0
-  ) {
-    throw new Error('Telegram ID noto‘g‘ri.')
-  }
-
   const response = await apiFetch(
     `${API_BASE_URL}/customers/profile`,
     {
@@ -188,15 +175,15 @@ export async function createCustomerProfile(
    ============================================================ */
 
 export async function updateCustomerProfile(
-  telegramId: number,
+  telegramId: number | undefined,
   data: CustomerProfileUpdate,
 ): Promise<CustomerProfile> {
-  if (!Number.isInteger(telegramId) || telegramId <= 0) {
+  if (telegramId !== undefined && (!Number.isInteger(telegramId) || telegramId <= 0)) {
     throw new Error('Telegram ID noto‘g‘ri.')
   }
 
   const response = await apiFetch(
-    `${API_BASE_URL}/customers/profile/${telegramId}`,
+    `${API_BASE_URL}/customers/profile/${telegramId ?? 'me'}`,
     {
       method: 'PATCH',
       headers: {

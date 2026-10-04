@@ -20,7 +20,7 @@ import {
    ============================================================ */
 
 interface ProfileSetupProps {
-  telegramId: number
+  telegramId?: number
   initialData?: Partial<CustomerProfile>
   onCompleted: (profile: CustomerProfile) => void
   onClose?: () => void
@@ -165,7 +165,7 @@ export default function ProfileSetup({
 
     try {
       const payload: CustomerProfileCreate = {
-        telegram_id: telegramId,
+        ...(telegramId ? { telegram_id: telegramId } : {}),
 
         name: cleanName,
         surname: cleanSurname,
@@ -181,7 +181,7 @@ export default function ProfileSetup({
       }
 
       const profile = initialData?.id
-        ? await updateCustomerProfile(telegramId, {
+        ? await updateCustomerProfile(telegramId ?? initialData.telegram_id ?? undefined, {
             name: cleanName,
             surname: cleanSurname,
             phone: cleanPhone,

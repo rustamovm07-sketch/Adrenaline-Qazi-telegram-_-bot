@@ -39,13 +39,12 @@ class CustomerProfileCreate(BaseModel):
     """
     Birinchi marta mijoz profilini yaratish uchun.
 
-    Telegram ID hozircha request orqali olinadi.
-    Keyingi Telegram Mini App authentication bosqichida
-    Telegram initData orqali server tomonidan ishonchli
-    aniqlanadi.
+    Telegram ID faqat eski klientlar bilan moslik uchun qabul qilinadi.
+    Saqlashda doim imzolangan Mini App sessiyasidagi ID ishlatiladi.
     """
 
-    telegram_id: int = Field(gt=0)
+    # Legacy clients may still send this; identity comes from signed initData.
+    telegram_id: int | None = Field(default=None, gt=0)
 
     name: str = Field(
         min_length=2,
@@ -269,6 +268,28 @@ async def upload_customer_profile_image(
     return {"image_url": f"/uploads/customers/{filename}"}
 
 
+@router.get("/profile/me")
+def get_my_customer_profile(
+    db: Session = Depends(get_db),
+    identity: TelegramIdentity = Depends(get_current_telegram_user),
+):
+    """Return the profile for the identity verified by the Mini App session."""
+    customer = (
+        db.query(Customer)
+        .filter(Customer.telegram_id == identity.telegram_id)
+        .first()
+    )
+    if not customer:
+        return {"exists": False, "profile_completed": False, "profile": None}
+    profile = customer_profile_response(customer)
+    db.commit()
+    return {
+        "exists": True,
+        "profile_completed": profile["profile_completed"],
+        "profile": profile,
+    }
+
+
 @router.get(
     "/profile/{telegram_id}",
 )
@@ -283,9 +304,7 @@ def get_customer_profile(
     Mini App:
         GET /customers/profile/{telegram_id}
 
-    Keyinchalik Telegram initData authentication
-    qo'shilganda telegram_id request path'dan emas,
-    server tomonidan tasdiqlangan Telegram user'dan olinadi.
+    Foydalanuvchi ID si imzolangan Mini App sessiyasi bilan solishtiriladi.
     """
 
     if telegram_id != identity.telegram_id:
@@ -345,7 +364,7 @@ def create_customer_profile(
     Bu duplicate customer yozuvlarining oldini oladi.
     """
 
-    if payload.telegram_id != identity.telegram_id:
+    if payload.telegram_id is not None and payload.telegram_id != identity.telegram_id:
         raise HTTPException(
             status_code=403,
             detail="Telegram foydalanuvchisi mos kelmadi.",
@@ -355,7 +374,7 @@ def create_customer_profile(
         db.query(Customer)
         .filter(
             Customer.telegram_id
-            == payload.telegram_id,
+            == identity.telegram_id,
         )
         .first()
     )
@@ -370,7 +389,7 @@ def create_customer_profile(
         )
 
     customer = Customer(
-        telegram_id=payload.telegram_id,
+        telegram_id=identity.telegram_id,
         name=payload.name.strip(),
         surname=payload.surname.strip(),
         phone=payload.phone.strip(),
@@ -404,6 +423,21 @@ def create_customer_profile(
             customer,
         ),
     }
+
+
+@router.patch("/profile/me")
+def update_my_customer_profile(
+    payload: CustomerProfileUpdate,
+    db: Session = Depends(get_db),
+    identity: TelegramIdentity = Depends(get_current_telegram_user),
+):
+    """Update the profile for the identity verified by the Mini App session."""
+    return update_customer_profile(
+        telegram_id=identity.telegram_id,
+        payload=payload,
+        db=db,
+        identity=identity,
+    )
 
 
 @router.patch(

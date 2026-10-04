@@ -1570,12 +1570,12 @@ export default function App() {
   const [profile, setProfile] =
     useState<CustomerProfile | null>(null)
   const [profileLoading, setProfileLoading] =
-    useState(() => Boolean(getTelegramInitData() && getTelegramUser()?.id))
+    useState(() => Boolean(getTelegramInitData()))
   const [showProfileSetup, setShowProfileSetup] =
     useState(false)
   const [authMessage, setAuthMessage] =
     useState<string | null>(() =>
-      getTelegramInitData() && getTelegramUser()?.id
+      getTelegramInitData()
         ? null
         : 'Profil yaratish va buyurtma berish uchun Telegram bot ichidagi Do‘konni ochish tugmasidan foydalaning.',
     )
@@ -1658,12 +1658,12 @@ export default function App() {
     webApp?.ready()
     webApp?.expand()
 
-    const user = getTelegramUser()
-    if (!webApp?.initData || !user?.id) {
+    if (!webApp?.initData) {
+      setProfileLoading(false)
       return
     }
 
-    void getCustomerProfile(user.id)
+    void getCustomerProfile()
       .then((customerProfile) => {
         setProfile(customerProfile)
         setShowProfileSetup(!customerProfile?.profile_completed)
@@ -2060,7 +2060,7 @@ export default function App() {
       return
     }
 
-    if (!getTelegramInitData() || !telegramUser) {
+    if (!getTelegramInitData()) {
       setAuthMessage(
         'Buyurtma berish uchun Mini App’ni Telegram bot ichidan oching.',
       )
@@ -2402,9 +2402,9 @@ export default function App() {
         </div>
       )}
 
-      {showProfileSetup && telegramUser?.id && (
+      {showProfileSetup && getTelegramInitData() && (
         <ProfileSetup
-          telegramId={telegramUser.id}
+          telegramId={telegramUser?.id}
           initialData={profile ?? undefined}
           onCompleted={(savedProfile) => {
             setProfile(savedProfile)
