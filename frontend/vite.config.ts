@@ -9,8 +9,9 @@ export default defineConfig(({ mode }) => ({
     tailwindcss(),
   ],
   server: {
+    allowedHosts: ['protocols-part-horizontal-natural.trycloudflare.com'],
     proxy: {
-      '^/(products|categories|customers|orders|dashboard|inventory|store-settings|uploads|health)(/|$)': {
+      '^/(auth|payments|products|categories|customers|orders|dashboard|inventory|store-settings|uploads|health)(/|$)': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
       },

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from .database import get_db
 from .models import Category, Product
+from .media_security import validate_image_bytes
 from .security import TelegramIdentity, require_admin
 from .schemas import CategoryCreate, CategoryResponse, CategoryUpdate
 
@@ -172,7 +173,11 @@ async def save_category_image(
 
                 output_file.write(chunk)
 
+        validate_image_bytes(file_path.read_bytes(), image.content_type)
+
     except HTTPException:
+        if file_path.exists():
+            file_path.unlink()
         raise
 
     except Exception as exc:

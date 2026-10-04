@@ -9,7 +9,7 @@ import {
   type StoreSettingsUpdate,
 } from '../api/storeSettings'
 
-const API_URL = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '')
+const API_URL = (import.meta.env.VITE_API_URL || window.location.origin).replace(/\/+$/, '')
 type Health = { status: string; service: string }
 
 const inputClass = 'mt-1.5 min-h-11 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-[#a77a2d] focus:ring-4 focus:ring-[#a77a2d]/10'
@@ -180,7 +180,7 @@ export default function SettingsPage() {
         <div className="mt-5 grid gap-3 sm:grid-cols-2">{settingsHelp.map(([key, description]) => <div key={key} className="rounded-xl bg-[#faf8f3] p-4"><code className="font-bold text-[#8f6725]">{key}</code><p className="mt-1 text-sm text-gray-600">{description}</p></div>)}</div>
         <a href="https://core.telegram.org/bots/webapps" target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-[#8f6725]">Telegram Mini App hujjatlari <ExternalLink size={15} /></a>
       </article>
-      <article className="rounded-3xl border border-amber-200 bg-amber-50 p-5"><h2 className="font-black text-amber-950">Click va Payme</h2><p className="mt-2 text-sm leading-6 text-amber-900">Onlayn to‘lov adapterlari hozircha ulanmagan. Buyurtmalar to‘lov kutilayotgan holatda qoladi va avtomatik ravishda to‘langan deb belgilanmaydi.</p></article>
+      <article className="rounded-3xl border border-[#7a1028]/15 bg-[#7a1028]/[.04] p-5"><h2 className="font-black text-[#7a1028]">Hamyon API · UZCARD</h2><p className="mt-2 text-sm leading-6 text-gray-700">Mini ilovada Hamyon to‘lov oqimi tayyor. Backend muhitida HAMYON_SHOP_ID, HAMYON_SHOP_KEY va HAMYON_CARD_ENCRYPTION_KEY sozlang; Hamyon kabinetida prepare_url va complete_url callback manzillarini ko‘rsating.</p></article>
     </section>
   )
 }

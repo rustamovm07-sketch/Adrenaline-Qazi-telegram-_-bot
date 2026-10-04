@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from .database import get_db
 from .models import Customer, Order
+from .media_security import validate_image_bytes
 from .security import TelegramIdentity, get_current_telegram_user, require_admin
 
 
@@ -261,6 +262,7 @@ async def upload_customer_profile_image(
             status_code=400,
             detail="Rasm faylining tarkibi formati bilan mos kelmadi.",
         )
+    validate_image_bytes(content, image_type)
 
     filename = f"{identity.telegram_id}_{uuid4().hex}{extension}"
     (UPLOAD_DIR / filename).write_bytes(content)
@@ -579,6 +581,7 @@ def get_customers(
                 "profile_image": customer.profile_image,
                 "latitude": customer.latitude,
                 "longitude": customer.longitude,
+                "accuracy": customer.accuracy,
                 "address": customer.address,
                 "landmark": customer.landmark,
                 "profile_completed": (
@@ -691,7 +694,12 @@ def get_customer(
                     order.payment_method
                 ),
                 "created_at": order.created_at,
+                "delivery_phone": order.delivery_phone,
+                "latitude": order.latitude,
+                "longitude": order.longitude,
+                "accuracy": order.accuracy,
                 "address": order.address,
+                "landmark": order.landmark,
                 "comment": order.comment,
                 "items": [
                     {

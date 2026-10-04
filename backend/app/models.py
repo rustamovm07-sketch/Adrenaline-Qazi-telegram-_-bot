@@ -9,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     func,
     Integer,
+    Index,
     Numeric,
     String,
     Text,
@@ -391,6 +392,13 @@ class Order(Base):
         nullable=False,
     )
 
+    # Yandex Go fare forecast attached to this delivery.
+    delivery_fee: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2),
+        default=Decimal("0"),
+        nullable=False,
+    )
+
     # =====================================================
     # BUYURTMA STATUSI
     #
@@ -408,7 +416,7 @@ class Order(Base):
     # PAYMENT
     # =====================================================
 
-    # Payme / Click / boshqa
+    # Hamyon UZCARD or an explicitly audited manual method
     payment_method: Mapped[str | None] = mapped_column(
         String(30),
         nullable=True,
@@ -557,6 +565,61 @@ class Order(Base):
         back_populates="order",
         cascade="all, delete-orphan",
         order_by="OrderStatusHistory.created_at",
+    )
+
+    payments = relationship(
+        "Payment",
+        back_populates="order",
+        cascade="all, delete-orphan",
+        order_by="Payment.created_at.desc()",
+    )
+
+
+class Payment(Base):
+    """A provider transaction record for one customer order."""
+
+    __tablename__ = "payments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    order_id: Mapped[int] = mapped_column(
+        ForeignKey("orders.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    provider: Mapped[str] = mapped_column(String(30), default="hamyon", nullable=False)
+    provider_payment_id: Mapped[str | None] = mapped_column(
+        String(255), unique=True, nullable=True, index=True
+    )
+    # The order total remains the source of truth. provider_amount may carry
+    # a tiny disclosed disambiguation difference for Hamyon's open payments.
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    provider_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), default="UZS", nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20), default="CREATING", nullable=False, index=True
+    )
+    # Hamyon returns the recipient card. Keep it encrypted at rest so a
+    # customer can reopen the pending payment without exposing it to admins.
+    card_number_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, nullable=False, index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    order = relationship("Order", back_populates="payments")
+
+    __table_args__ = (
+        Index(
+            "uq_payments_open_provider_amount",
+            "provider_amount",
+            unique=True,
+            postgresql_where=(status.in_(["CREATING", "PENDING", "PROCESSING"])),
+        ),
     )
 
 

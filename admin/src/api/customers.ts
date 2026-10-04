@@ -2,7 +2,7 @@ import { apiFetch } from './http'
 
 const API_URL =
   import.meta.env.VITE_API_URL ||
-  'http://127.0.0.1:8000'
+  window.location.origin
 
 export type CustomerOrderItem = {
   id: number
@@ -30,7 +30,12 @@ export type CustomerOrder = {
   payment_confirmed: boolean
   payment_method: string | null
   created_at: string
+  delivery_phone: string | null
+  latitude: number
+  longitude: number
+  accuracy: number | null
   address: string | null
+  landmark: string | null
   comment: string | null
   items: CustomerOrderItem[]
 }
@@ -39,7 +44,15 @@ export type Customer = {
   id: number
   telegram_id: number | null
   name: string
+  surname: string | null
   phone: string
+  profile_image: string | null
+  latitude: number | null
+  longitude: number | null
+  accuracy?: number | null
+  address: string | null
+  landmark: string | null
+  profile_completed: boolean
 
   created_at: string
   updated_at: string

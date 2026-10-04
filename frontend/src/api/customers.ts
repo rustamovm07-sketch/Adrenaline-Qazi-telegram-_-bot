@@ -2,7 +2,7 @@ import { apiFetch } from './telegram'
 
 const API_BASE_URL =
   import.meta.env.VITE_API_URL ||
-  'http://127.0.0.1:8000'
+  window.location.origin
 
 export function getCustomerImageUrl(
   image: string | null,

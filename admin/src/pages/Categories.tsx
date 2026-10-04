@@ -39,7 +39,7 @@ function getImageUrl(image: string | null) {
 
   const apiUrl =
     import.meta.env.VITE_API_URL ||
-    'http://127.0.0.1:8000'
+    window.location.origin
 
   return `${apiUrl.replace(/\/$/, '')}/${image.replace(/^\//, '')}`
 }

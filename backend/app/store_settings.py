@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from .database import get_db
 from .models import StoreSettings
+from .media_security import validate_image_bytes
 from .schemas import StoreSettingsResponse, StoreSettingsUpdate
 from .security import TelegramIdentity, require_admin
 
@@ -88,6 +89,7 @@ async def upload_store_image(
         extension, signature_check = image_info
         if not signature_check(content):
             raise HTTPException(status_code=400, detail="Rasm faylining formati tarkibiga mos kelmadi.")
+        validate_image_bytes(content, image.content_type)
 
         filename = f"shop_{uuid4().hex}{extension}"
         (IMAGE_DIR / filename).write_bytes(content)

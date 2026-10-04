@@ -2,7 +2,7 @@ import { apiFetch } from './telegram'
 
 const API_URL =
   import.meta.env.VITE_API_URL ||
-  'http://127.0.0.1:8000'
+  window.location.origin
 
 /* ============================================================
    TYPES
@@ -60,7 +60,6 @@ export type OrderItem = {
 
 export type Order = {
   id: number
-  customer_id: number
 
   total: number
 

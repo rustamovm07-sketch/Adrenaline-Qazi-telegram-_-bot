@@ -14,7 +14,8 @@ from sqlalchemy.orm import Session, joinedload
 
 from .database import get_db
 from .models import Category, InventoryMovement, OrderItem, Product
-from .schemas import ProductResponse
+from .media_security import validate_image_bytes
+from .schemas import ProductResponse, PublicProductResponse
 from .inventory import release_expired_reservations
 from .security import (
     TelegramIdentity,
@@ -38,9 +39,9 @@ UPLOAD_DIR = BASE_DIR / "uploads" / "products"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 ALLOWED_TYPES = {
-    "image/jpeg",
-    "image/png",
-    "image/webp",
+    "image/jpeg": {".jpg", ".jpeg"},
+    "image/png": {".png"},
+    "image/webp": {".webp"},
 }
 
 ALLOWED_EXTENSIONS = {
@@ -144,13 +145,13 @@ async def save_product_image(
 
     extension = Path(original_filename).suffix.lower()
 
-    if extension not in ALLOWED_EXTENSIONS:
+    if extension not in ALLOWED_EXTENSIONS or extension not in ALLOWED_TYPES[image.content_type]:
         raise HTTPException(
             status_code=400,
             detail="Rasm formati noto'g'ri",
         )
 
-    content = await image.read()
+    content = await image.read(MAX_FILE_SIZE + 1)
 
     if not content:
         raise HTTPException(
@@ -163,6 +164,15 @@ async def save_product_image(
             status_code=400,
             detail="Rasm hajmi 5 MB dan oshmasligi kerak",
         )
+
+    signatures = {
+        "image/jpeg": lambda data: data.startswith(b"\xff\xd8\xff"),
+        "image/png": lambda data: data.startswith(b"\x89PNG\r\n\x1a\n"),
+        "image/webp": lambda data: len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP",
+    }
+    if not signatures[image.content_type](content):
+        raise HTTPException(status_code=400, detail="Rasm faylining tarkibi formati bilan mos kelmadi")
+    validate_image_bytes(content, image.content_type)
 
     safe_name = "".join(
         char if char.isalnum() or char in "._-" else "_"
@@ -228,7 +238,7 @@ def product_query(db: Session):
 # GET ALL PRODUCTS
 # ============================================================
 
-@router.get("/", response_model=list[ProductResponse])
+@router.get("/")
 def get_products(
     db: Session = Depends(get_db),
     identity: TelegramIdentity | None = Depends(get_optional_telegram_user),
@@ -246,14 +256,17 @@ def get_products(
             Product.is_available.is_(True),
             Product.stock_units > Product.reserved_stock_units,
         )
-    return query.order_by(Product.id.desc()).all()
+
+    products = query.order_by(Product.id.desc()).all()
+    schema = ProductResponse if is_admin_identity(identity) else PublicProductResponse
+    return [schema.model_validate(product) for product in products]
 
 
 # ============================================================
 # GET SINGLE PRODUCT
 # ============================================================
 
-@router.get("/{product_id}", response_model=ProductResponse)
+@router.get("/{product_id}")
 def get_product(
     product_id: int,
     db: Session = Depends(get_db),
@@ -280,7 +293,8 @@ def get_product(
             detail="Mahsulot topilmadi",
         )
 
-    return product
+    schema = ProductResponse if is_admin_identity(identity) else PublicProductResponse
+    return schema.model_validate(product)
 
 
 # ============================================================

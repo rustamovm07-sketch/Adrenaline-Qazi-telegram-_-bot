@@ -5,7 +5,7 @@ Adrenalin Qazi - Telegram ichida ochiladigan oziq-ovqat do'koni, admin panel, Fa
 ## Loyiha tarkibi
 
 - `frontend/` - mijozlar do'koni: katalog, qidiruv, savat, profil, lokatsiya va buyurtmalar.
-- `admin/` - egaga mo'ljallangan panel: dashboard, buyurtmalar, mahsulotlar, kategoriyalar, mijozlar, CSV hisobot va tizim holati.
+- `admin/` - egaga mo'ljallangan panel: dashboard, buyurtmalar, Hamyon to'lovlari, mahsulotlar, kategoriyalar, mijozlar, CSV hisobot va tizim holati.
 - `backend/` - Telegram autentifikatsiyasi, API, buyurtmalar, ombor bandi va bot.
 - `backend/migrations/` - PostgreSQL uchun SQL migrationlar.
 - `backend/uploads/` - do'kon, mahsulot, kategoriya va buyurtma rasmlari. Yuklangan fayllar repoga kiritilmaydi.
@@ -17,12 +17,14 @@ Adrenalin Qazi - Telegram ichida ochiladigan oziq-ovqat do'koni, admin panel, Fa
 - Mijoz profili ism, familiya, telefon, manzil, orientir va GPS koordinatalarini saqlaydi. Profil rasmi majburiy emas; mijozlarga do'kon rasmi va do'kon lokatsiyasi ko'rsatiladi.
 - Katalog, kategoriya, qidiruv, mahsulot tafsiloti va saqlanadigan savat mavjud.
 - Saqlangan profil va manzil bilan buyurtmani tez rasmiylashtirish mumkin. Yetkazish manzili rasmini (JPG/PNG/WEBP, 5 MB gacha) biriktirish shart; xarita, telefon va manzilni tahrirlash, izoh, sana va vaqt kiritish mumkin. Rasm yuklangan asl fayl holida saqlanadi; ko'rishda kesilmaydi, tafsilotda asl rasmni alohida ochish mumkin.
+- Checkoutdagi Yandex Go tugmasi mijoz tanlagan manzilni va do'kon lokatsiyasini Yandex Go ilovasiga yo'naltiradi. Yandex Go o'zida yo'nalish hamda amaldagi narxni ko'rsatadi; loyiha Yandex tarif API'sidan foydalanmaydi va yetkazish haqini buyurtmaga qo'shmaydi.
 - Buyurtmada manzil, koordinata, orientir, telefon va manzil rasmi alohida saqlanadi. Keyin profil tahrirlansa, eski buyurtma o'zgarmaydi. Manzil rasmi admin buyurtma tafsilotida ko'rinadi.
 - Buyurtma holatlari: `PAYMENT_PENDING`, `PAID`, `CONFIRMED`, `PREPARING`, `READY`, `DELIVERING`, `DELIVERED`, `CANCELLED`. O'zgarishlar tarixi bazada saqlanib, admin buyurtma tafsilotida ko'rinadi.
 - Mahsulot qoldigi buyurtma ochilganda sotilgan hisoblanmaydi. Miqdor odatda 12 soat band qilinadi; muddat tugaganda yoki admin buyurtmani bekor qilganda band boshatiladi. Backend API ishga tushganida bandlarni har daqiqada tekshiradi. To'lovni backend tasdiqlagandagina haqiqiy qoldiq kamayadi.
 - Ombor sahifasida boshlang'ich kirim, keyingi kirim, qaytarish, qo'lda tuzatish va tasdiqlangan sotuv yozuvlari ko'rinadi. Band qoldiq alohida hisoblanadi; har bir yozuv admin ID, vaqt, mahsulot va buyurtma bilan bog'lanadi.
 - Egaga yangi buyurtma haqida Telegram xabari bor. Buyurtma yetkazishga chiqarilganda, yetkazilganda yoki bekor qilinganda mijozga Telegram xabari yuboriladi.
 - Admin API egasining `ADMIN_TELEGRAM_ID` qiymati bilan cheklangan. Admin sahifalari Telegram ichida egasining akkaunti bilan ochiladi.
+- Qisqa muddatli Telegram initData tekshirilgach, API uchun 12 soatlik xotira tokeni olinadi. Frontend tokenni brauzer xotirasida saqlab, 401 javobida sessiyani yangilaydi; eskirgan initData sababli har bir so'rovda sessiya xatosi chiqmaydi.
 - Admin mahsulot/kategoriya CRUD, buyurtma ro'yxati, mijozlar tafsiloti, dashboard statistikasi va Excel'da ochiladigan CSV hisobot bilan ishlaydi.
 - Admin sozlamalarida do'kon rasmi, nomi, aloqa telefoni, Telegram manzili, lokatsiya, mijozlar qo'llanmasi, foydalanish shartlari va yangilanishlar matnini boshqarish mumkin.
 - Mijoz Profil bo'limida do'kon lokatsiyasini xaritada, aloqa ma'lumotlarini hamda qo'llanma, shartlar va yangilanishlarni ko'radi.
@@ -31,16 +33,15 @@ Adrenalin Qazi - Telegram ichida ochiladigan oziq-ovqat do'koni, admin panel, Fa
 
 Quyidagilar production funksiyasi deb hisoblanmaydi:
 
-- **Click va Payme:** checkout va provider callback adapterlari ulanmagan. Hozir buyurtma `PAYMENT_PENDING` holatida qoladi; haqiqiy to'lov qabul qilinmaydi va buyurtma `PAID` bo'lmaydi. Ishga tushirish uchun merchant hisobi/kalitlari, provider qaytish manzili, ochiq HTTPS callback URL, integratsiya va provider sandbox sinovi kerak.
-- **Buyurtma oqimi:** bosqichlar va statuslar tarixi bor. Lekin `PAID` ga o'tish uchun to'lov adapteri hali kerak; mavjud bo'lmagani sabab yangi buyurtmalar `PAYMENT_PENDING` da turadi.
+- **Hamyon API · UZCARD:** to'lov yaratish, imzolangan `prepare`/`complete` callback, qayta yuborilgan callback'larni idempotent qayta ishlash, timeout/late-payment holatlari va admin to'lovlar ro'yxati ulangan. Haqiqiy to'lovni yoqish uchun Hamyon merchant kalitlari, shifrlash kaliti, callback sozlamalari va provayder bilan jonli tekshiruv talab qilinadi.
 - **Hisobot:** buyurtma va mahsulot qatorlarini CSV qilib yuklash mumkin. Foyda tannarxi, mijoz bo'yicha xaridlar va alohida kun/hafta/oy analitikasi hozircha to'liq emas.
 - **Nasiya/qarz, promo-kod, chegirma, referral, cashback va kuryer boshqaruvi** mavjud emas.
-- **API rate limiting** (IP yoki foydalanuvchi bo'yicha so'rov tezligini cheklash) hozir yo'q. Ommaviy serverga chiqarishdan oldin reverse proxy/API gateway darajasida limit va monitoring sozlang.
-- Alohida to'lov tranzaksiyalari, qarz, promo va kuryer uchun to'liq audit jadvallari yo'q. Hozir buyurtma holati tarixi va ombor harakati alohida qayd qilinadi.
+- API Redis orqali barcha workerlar o'rtasida rate limit qo'llaydi. Production'da `REDIS_URL` shart; Redis ishlamasa server ishga tushmaydi. Limitlar: global 60/min/IP, buyurtma 5/min/foydalanuvchi, profil va upload 10/min/foydalanuvchi, admin mutation 30/min/admin.
+- Qarz, promo va kuryer boshqaruvi hozircha mavjud emas. Buyurtma holati tarixi, ombor harakati va Hamyon tranzaksiyalari alohida qayd qilinadi.
 - **Sozlamalar sahifasi** do'kon ma'lumotlari, aloqa, lokatsiya, rasm va mijozlarga ko'rsatiladigan matnlarni boshqaradi. Server sirlarini (`.env`) ilova ichidan tahrirlamaydi.
-- Muvaffaqiyatli to'lov xabari faqat Click/Payme callback integratsiyasi qo'shilgandan keyin ishlaydi.
+- Hamyon kabinetida `prepare_url` va `complete_url` ni `https://<backend-host>/payments/callbacks/prepare` hamda `https://<backend-host>/payments/callbacks/complete` qilib sozlang. Backend ushbu callback'lardagi Hamyon imzosini va buyurtma/summani tekshiradi.
 
-Shuning uchun loyiha hozir **ishlab chiqish va ko'rib chiqish uchun tayyor, ammo haqiqiy to'lovli savdoga tayyor emas**. Bot tokenning o'zi yetmaydi: egasining Telegram ID'si, ommaga ochiq HTTPS manzillar va to'lov qabul qilinadigan bo'lsa merchant integratsiyasi ham kerak.
+Kod test va sozlashga tayyor. Jonli savdo uchun Hamyon merchant kalitlari/callback'lari, egasining Telegram ID'si va HTTPS manzillar kerak. Yandex Go ilovasiga yo'naltirish API kalitini talab qilmaydi.
 
 ## Talablar
 
@@ -69,6 +70,7 @@ psql "postgresql://USER:PASSWORD@localhost:5432/adrenalin_qazi" -f migrations/00
 psql "postgresql://USER:PASSWORD@localhost:5432/adrenalin_qazi" -f migrations/007_inventory_movements.sql
 psql "postgresql://USER:PASSWORD@localhost:5432/adrenalin_qazi" -f migrations/008_order_delivery_image.sql
 psql "postgresql://USER:PASSWORD@localhost:5432/adrenalin_qazi" -f migrations/009_store_settings.sql
+psql "postgresql://USER:PASSWORD@localhost:5432/adrenalin_qazi" -f migrations/010_payments_delivery_fee.sql
 ```
 
 `USER` va `PASSWORD` o'rniga PostgreSQL foydalanuvchi ma'lumotlarini kiriting. Buyruq terminal tarixida parol qoldirishi mumkin; production'da parolni alohida xavfsiz usulda uzating. Mavjud baza va migrationlar allaqachon qo'llangan bo'lsa, qayta ishlatishdan oldin holatni tekshiring.
@@ -84,11 +86,20 @@ ADMIN_TELEGRAM_ID=
 MINI_APP_URL=https://sizning-domeningiz.uz/shop
 ADMIN_PANEL_URL=https://sizning-domeningiz.uz/admin
 CORS_ORIGINS=https://sizning-domeningiz.uz
-TELEGRAM_INIT_DATA_MAX_AGE_SECONDS=86400
+TELEGRAM_INIT_DATA_MAX_AGE_SECONDS=300
+APP_ENV=production
+REDIS_URL=redis://127.0.0.1:6379/0
 ORDER_RESERVATION_HOURS=12
+MINI_APP_SESSION_TTL_SECONDS=43200
+HAMYON_API_BASE_URL=https://hamyon-api.uz
+HAMYON_SHOP_ID=
+HAMYON_SHOP_KEY=
+HAMYON_CARD_ENCRYPTION_KEY=
 ```
 
 `BOT_TOKEN` va database parolini repoga, issue'ga, frontend `.env` fayliga yoki chatga joylamang. Tokenni faqat `backend/.env` ichiga kiriting.
+
+Hamyon uchun yuqoridagi shop ID/key va Fernet shifrlash kalitini backend muhitiga kiriting. Fernet kalitini `.venv` yoqilgan terminalda `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` bilan yarating. Hamyon kabinetiga callback URL'larni kiriting. Yandex Go yo'nalish havolasi uchun API kalitlari talab qilinmaydi. Ilovada do'kondan mijoz manziligacha yo'nalish chiqarish uchun Admin > Sozlamalar'da do'kon lokatsiyasini kiriting. Maxfiy kalitlarni browser `.env` ga qo'ymang.
 
 PowerShell'da, loyiha ildizidan:
 
@@ -96,7 +107,7 @@ PowerShell'da, loyiha ildizidan:
 cd backend
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
-py -m pip install -r requirements.txt
+py -m pip install -r requirements-dev.txt
 uvicorn app.main:app --reload
 ```
 
@@ -163,6 +174,7 @@ npm run lint
 npm run build
 cd ..\backend
 .\.venv\Scripts\python.exe -m compileall -q app
+python -m pytest -q
 ```
 
 ## Xavfsizlik va ishlatish eslatmalari

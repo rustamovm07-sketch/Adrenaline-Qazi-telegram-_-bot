@@ -2,12 +2,22 @@ import { apiFetch } from './http'
 
 const API_URL =
   import.meta.env.VITE_API_URL ||
-  'http://127.0.0.1:8000'
+  window.location.origin
 
 export function getOrderDeliveryImageUrl(image: string | null): string | null {
   if (!image) return null
   if (/^https?:\/\//i.test(image)) return image
   return `${API_URL.replace(/\/+$/, '')}/${image.replace(/^\/+/, '')}`
+}
+
+export async function fetchOrderDeliveryImage(image: string): Promise<string> {
+  const target = getOrderDeliveryImageUrl(image)
+  if (!target) throw new Error('Rasm manzili topilmadi')
+  const response = target.startsWith(`${API_URL.replace(/\/+$/, '')}/`)
+    ? await apiFetch(target)
+    : await fetch(target)
+  if (!response.ok) throw new Error('Rasmni yuklab bo\u2018lmadi')
+  return URL.createObjectURL(await response.blob())
 }
 
 export type OrderStatus =

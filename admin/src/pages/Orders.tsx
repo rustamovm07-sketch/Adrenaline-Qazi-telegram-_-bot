@@ -22,7 +22,7 @@ import {
 } from 'lucide-react'
 
 import {
-  getOrderDeliveryImageUrl,
+  fetchOrderDeliveryImage,
   getOrders,
   updateOrderDelivery,
   updateOrderStatus,
@@ -168,6 +168,35 @@ function Orders() {
   ] = useState<Order | null>(
     null,
   )
+
+  const [deliveryImage, setDeliveryImage] = useState<{
+    source: string
+    url: string | null
+    error: boolean
+  } | null>(null)
+
+  useEffect(() => {
+    const source = selectedOrder?.delivery_image_url
+    if (!source) return
+    let disposed = false
+    let objectUrl: string | null = null
+    void fetchOrderDeliveryImage(source)
+      .then((url) => {
+        objectUrl = url
+        if (disposed) {
+          URL.revokeObjectURL(url)
+          return
+        }
+        setDeliveryImage({ source, url, error: false })
+      })
+      .catch(() => {
+        if (!disposed) setDeliveryImage({ source, url: null, error: true })
+      })
+    return () => {
+      disposed = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [selectedOrder?.delivery_image_url])
 
   const [
     updatingStatusId,
@@ -1473,21 +1502,14 @@ function Orders() {
                   </a>
 
                   {selectedOrder.delivery_image_url && (
-                    <a
-                      href={getOrderDeliveryImageUrl(selectedOrder.delivery_image_url) ?? undefined}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-4 block overflow-hidden rounded-xl bg-white ring-1 ring-gray-200"
-                    >
-                      <img
-                        src={getOrderDeliveryImageUrl(selectedOrder.delivery_image_url) ?? undefined}
-                        alt="Yetkazib berish manzili rasmi"
-                        className="max-h-80 w-full object-contain"
-                      />
-                      <span className="block px-4 py-3 text-sm font-bold text-gray-800">
-                        Manzil rasmi
-                      </span>
-                    </a>
+                    deliveryImage?.source === selectedOrder.delivery_image_url
+                      ? deliveryImage.url ? (
+                        <a href={deliveryImage.url} target="_blank" rel="noreferrer" className="mt-4 block overflow-hidden rounded-xl bg-white ring-1 ring-gray-200">
+                          <img src={deliveryImage.url} alt="Yetkazib berish manzili rasmi" className="max-h-80 w-full object-contain" />
+                          <span className="block px-4 py-3 text-sm font-bold text-gray-800">Manzil rasmi</span>
+                        </a>
+                      ) : <p role="status" className="mt-4 text-sm text-gray-500">{deliveryImage.error ? 'Manzil rasmini yuklab bo‘lmadi.' : 'Manzil rasmi yuklanmoqda…'}</p>
+                      : <p role="status" className="mt-4 text-sm text-gray-500">Manzil rasmi yuklanmoqda…</p>
                   )}
 
                 </div>

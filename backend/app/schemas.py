@@ -117,6 +117,22 @@ class ProductResponse(BaseModel):
     )
 
 
+class PublicProductResponse(BaseModel):
+    id: int
+    name: str
+    description: str | None = None
+    price: Decimal
+    category_id: int
+    category: CategoryResponse
+    image: str | None = None
+    unit_type: Literal["kg", "dona"]
+    weight_per_unit: Decimal
+    available_stock_units: Decimal
+    is_available: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # ============================================================
 # ORDER ITEMS
 # ============================================================
@@ -170,19 +186,11 @@ class OrderItemResponse(BaseModel):
 
 
 class CustomerShortResponse(BaseModel):
-    id: int
-
-    telegram_id: int | None = None
-
     name: str
 
     surname: str | None = None
 
     phone: str
-
-    profile_image: str | None = None
-
-    profile_completed: bool = False
 
     model_config = ConfigDict(
         from_attributes=True
@@ -327,6 +335,7 @@ class OrderCreate(BaseModel):
 
     delivery_time: str | None = Field(default=None, max_length=50)
 
+
     # --------------------------------------------------------
     # PRODUCTS
     # --------------------------------------------------------
@@ -343,10 +352,6 @@ class OrderCreate(BaseModel):
 
 class OrderResponse(BaseModel):
     id: int
-
-    customer_id: int
-
-    customer: CustomerShortResponse | None = None
 
     total: Decimal
 
@@ -369,8 +374,6 @@ class OrderResponse(BaseModel):
     payment_method: str | None = None
 
     payment_confirmed: bool
-
-    payment_transaction_id: str | None = None
 
     payment_confirmed_at: datetime | None = None
 
@@ -436,11 +439,28 @@ class OrderStatusHistoryResponse(BaseModel):
     id: int
     previous_status: str | None = None
     new_status: str
-    actor_telegram_id: int | None = None
     note: str | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AdminCustomerShortResponse(CustomerShortResponse):
+    id: int
+    telegram_id: int | None = None
+    profile_image: str | None = None
+    profile_completed: bool = False
+
+
+class AdminOrderStatusHistoryResponse(OrderStatusHistoryResponse):
+    actor_telegram_id: int | None = None
+
+
+class AdminOrderResponse(OrderResponse):
+    customer_id: int
+    customer: AdminCustomerShortResponse | None = None
+    payment_transaction_id: str | None = None
+    status_history: list[AdminOrderStatusHistoryResponse] = Field(default_factory=list)
 
 
 class OrderStatusUpdate(BaseModel):
@@ -493,6 +513,44 @@ class PaymentResponse(BaseModel):
     model_config = ConfigDict(
         from_attributes=True
     )
+
+
+class HamyonPaymentCreateResponse(BaseModel):
+    payment_id: str
+    order_id: int
+    order_amount: Decimal
+    payment_amount: Decimal
+    currency: str
+    card: str
+    status: str
+    expires_at: datetime | None = None
+
+
+class HamyonPaymentStatusResponse(BaseModel):
+    payment_id: str
+    order_id: int
+    order_amount: Decimal
+    payment_amount: Decimal
+    currency: str
+    status: str
+    card: str | None = None
+    expires_at: datetime | None = None
+    paid_at: datetime | None = None
+
+
+class PaymentAdminResponse(BaseModel):
+    id: int
+    order_id: int
+    provider: str
+    provider_payment_id: str | None = None
+    amount: Decimal
+    provider_amount: Decimal
+    currency: str
+    status: str
+    created_at: datetime
+    expires_at: datetime | None = None
+    paid_at: datetime | None = None
+    cancelled_at: datetime | None = None
 
 
 class InventoryMovementCreate(BaseModel):

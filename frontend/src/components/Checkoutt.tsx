@@ -1,6 +1,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 
@@ -18,10 +19,33 @@ import {
   createOrder,
   uploadOrderDeliveryImage,
 } from '../api/orders'
+import { createHamyonPayment, type HamyonPayment } from '../api/payments'
+import { getPublicStoreSettings } from '../api/storeSettings'
 import type { CustomerProfile } from '../api/customers'
 
 import LocationPicker from './LocationPicker'
+import PaymentScreen from './PaymentScreen'
 import type { LocationValue } from './LocationPicker'
+
+const YANDEX_GO_TRACKING_ID = '1178268795219780156'
+
+function yandexGoRouteUrl(
+  destination: LocationValue,
+  origin: { latitude: number; longitude: number },
+) {
+  const params = new URLSearchParams({
+    'end-lat': String(destination.latitude),
+    'end-lon': String(destination.longitude),
+    app_code: '3',
+    tariffClass: 'econom',
+    ref: 'adrenalinqazi',
+    appmetrica_tracking_id: YANDEX_GO_TRACKING_ID,
+    lang: 'uz',
+  })
+  params.set('start-lat', String(origin.latitude))
+  params.set('start-lon', String(origin.longitude))
+  return `https://3.redirect.appmetrica.yandex.com/route?${params.toString()}`
+}
 
 type CheckoutItem = {
   id: number
@@ -54,16 +78,12 @@ export default function Checkout({
   const [deliveryTime, setDeliveryTime] = useState('')
   const [deliveryPhoto, setDeliveryPhoto] = useState<File | null>(null)
   const [deliveryPhotoPreview, setDeliveryPhotoPreview] = useState<string | null>(null)
-
+  const deliveryPhotoUrl = useRef<string | null>(null)
   useEffect(() => {
-    if (!deliveryPhoto) {
-      setDeliveryPhotoPreview(null)
-      return
+    return () => {
+      if (deliveryPhotoUrl.current) URL.revokeObjectURL(deliveryPhotoUrl.current)
     }
-    const previewUrl = URL.createObjectURL(deliveryPhoto)
-    setDeliveryPhotoPreview(previewUrl)
-    return () => URL.revokeObjectURL(previewUrl)
-  }, [deliveryPhoto])
+  }, [])
 
   const [location, setLocation] =
     useState<LocationValue | null>(
@@ -97,6 +117,21 @@ export default function Checkout({
     useState<number | null>(null)
   const [successReservationExpiresAt, setSuccessReservationExpiresAt] =
     useState<string | null>(null)
+  const [storeLocation, setStoreLocation] = useState<{ latitude: number; longitude: number } | null>(null)
+  const [payment, setPayment] = useState<HamyonPayment | null>(null)
+  const [paymentSetupError, setPaymentSetupError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    void getPublicStoreSettings()
+      .then((settings) => {
+        if (active && settings.latitude !== null && settings.longitude !== null) {
+          setStoreLocation({ latitude: settings.latitude, longitude: settings.longitude })
+        }
+      })
+      .catch(() => { if (active) setStoreLocation(null) })
+    return () => { active = false }
+  }, [])
 
   const getItemSubtotal = (
     item: CheckoutItem,
@@ -212,7 +247,6 @@ export default function Checkout({
       )
       return
     }
-
     if (!deliveryPhoto) {
       setError('Yetkazib berish manzili rasmini biriktiring.')
       return
@@ -287,7 +321,6 @@ export default function Checkout({
         delivery_date: deliveryDate || null,
 
         delivery_time: deliveryTime || null,
-
         items: items.map((item) => ({
           product_id: item.id,
 
@@ -300,6 +333,11 @@ export default function Checkout({
 
       setSuccessOrderId(order.id)
       setSuccessReservationExpiresAt(order.reservation_expires_at)
+      try {
+        setPayment(await createHamyonPayment(order.id))
+      } catch (cause) {
+        setPaymentSetupError(cause instanceof Error ? cause.message : 'Hamyon to‘lovini yaratib bo‘lmadi.')
+      }
     } catch (submitError) {
       const message =
         submitError instanceof Error
@@ -312,13 +350,15 @@ export default function Checkout({
     }
   }
 
+  if (successOrderId !== null && payment) {
+    return <PaymentScreen orderId={successOrderId} initialPayment={payment} onClose={() => { onSuccess?.(); onClose() }} />
+  }
+
   if (successOrderId !== null) {
     const handleSuccessClose = () => {
       /*
        * App.tsx cartni tozalashi uchun callback.
        */
-      onSuccess?.()
-
       onClose()
     }
 
@@ -373,8 +413,10 @@ export default function Checkout({
           </div>
 
           <p className="mt-4 text-sm leading-6 text-stone-500">
-            Buyurtmangiz yaratildi va to'lov tasdig'ini kutmoqda. Hozircha Click yoki Payme orqali to'lov ulanmagan, shu sabab buyurtma to'langan hisoblanmaydi.
+            Buyurtmangiz yaratildi. Hamyon to‘lovini ochish uchun qayta urinib ko‘ring.
           </p>
+          {paymentSetupError && <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{paymentSetupError}</p>}
+          <button type="button" onClick={async () => { try { setPayment(await createHamyonPayment(successOrderId)) } catch (cause) { setPaymentSetupError(cause instanceof Error ? cause.message : 'To‘lov yaratilmadi.') } }} className="mt-4 min-h-12 w-full rounded-2xl bg-[#7a1028] px-5 py-3 font-bold text-white">Hamyon orqali to‘lash</button>
 
           {successReservationExpiresAt && (
             <p className="mt-2 text-xs text-stone-500">
@@ -640,6 +682,10 @@ export default function Checkout({
                         event.target.value = ''
                         return
                       }
+                      if (deliveryPhotoUrl.current) URL.revokeObjectURL(deliveryPhotoUrl.current)
+                      const previewUrl = URL.createObjectURL(file)
+                      deliveryPhotoUrl.current = previewUrl
+                      setDeliveryPhotoPreview(previewUrl)
                       setDeliveryPhoto(file)
                       setError(null)
                     }}
@@ -763,21 +809,19 @@ export default function Checkout({
               </div>
 
               {/* TOTAL PRICE */}
+              {location && (storeLocation ? <a href={yandexGoRouteUrl(location, storeLocation)} className="mt-3 flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-[#7a1028]/20 bg-[#7a1028]/[.05] px-4 py-3 text-center text-sm font-black text-[#7a1028]">
+                <MapPin size={18} /> Yandex Go’da yo‘nalish va narxni ko‘rish
+              </a> : <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-center text-xs text-amber-900">Do‘kon lokatsiyasi admin sozlamalarida kiritilmagan.</p>)}
               <div className="mt-2 flex items-center justify-between">
-                <span className="text-lg font-bold text-stone-700">
-                  Jami
-                </span>
-
-                <span className="text-2xl font-black text-amber-700">
-                  {formatPrice(total)} so‘m
-                </span>
+                <span className="text-lg font-bold text-stone-700">Jami</span>
+                <span className="text-2xl font-black text-amber-700">{formatPrice(total)} so‘m</span>
               </div>
             </div>
 
             {/* PAYMENT INFO */}
             <div className="mt-4 rounded-2xl bg-blue-50 p-4">
               <p className="text-sm leading-5 text-blue-800">
-                Buyurtma yuborilganda mahsulotlar 12 soatga band qilinadi. Hozircha Payme va Click to'lovlari ulanmagan; to'lovni do'kon bilan kelishib oling. To'lov tasdiqlanmasa, bandlov muddati tugagach buyurtma bekor qilinadi.
+                Yetkazish narxi buyurtma summasiga kirmaydi. Yandex Go tugmasi manzilni ilovada ochadi; narxni Yandex Go o‘zi ko‘rsatadi. To‘lov Hamyon API orqali UZCARD bilan amalga oshadi.
               </p>
             </div>
           </div>
@@ -805,7 +849,7 @@ export default function Checkout({
               >
                 {isSubmitting
                   ? 'Yuborilmoqda...'
-                  : 'Buyurtma berish'}
+                  : `Hamyon bilan to‘lash · ${formatPrice(total)} so‘m`}
               </button>
             </div>
           </div>

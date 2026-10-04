@@ -1,5 +1,5 @@
 from datetime import datetime, time
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 import os
 from pathlib import Path
 from uuid import uuid4
@@ -9,8 +9,10 @@ from sqlalchemy.orm import Session, selectinload
 
 from .database import get_db
 from .models import Customer, InventoryMovement, Order, OrderItem, OrderStatusHistory, Product
+from .media_security import validate_image_bytes
 from .schemas import (
     DeliveryUpdate,
+    AdminOrderResponse,
     OrderCreate,
     OrderResponse,
     OrderStatusUpdate,
@@ -84,6 +86,7 @@ async def upload_delivery_image(
         extension, signature_check = image_info
         if not signature_check(content):
             raise HTTPException(status_code=400, detail="Rasm faylining tarkibi formati bilan mos kelmadi.")
+        validate_image_bytes(content, image.content_type)
 
         filename = f"{identity.telegram_id}_{uuid4().hex}{extension}"
         (DELIVERY_IMAGE_DIR / filename).write_bytes(content)
@@ -675,7 +678,7 @@ def create_order(
                 "subtotal"
             ]
 
-        order.total = total
+        order.total = total.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
 
         db.commit()
 
@@ -732,7 +735,7 @@ def get_my_orders(
 
 @router.get(
     "/",
-    response_model=list[OrderResponse],
+    response_model=list[AdminOrderResponse],
 )
 def get_orders(
     db: Session = Depends(get_db),
@@ -759,7 +762,6 @@ def get_orders(
 
 @router.get(
     "/{order_id}",
-    response_model=OrderResponse,
 )
 def get_order(
     order_id: int,
@@ -790,7 +792,8 @@ def get_order(
             detail="Bu buyurtmani ko'rishga ruxsatingiz yo'q.",
         )
 
-    return order
+    response_schema = AdminOrderResponse if is_admin else OrderResponse
+    return response_schema.model_validate(order)
 
 
 # ============================================================
@@ -799,7 +802,7 @@ def get_order(
 
 @router.patch(
     "/{order_id}/status",
-    response_model=OrderResponse,
+    response_model=AdminOrderResponse,
 )
 def update_order_status(
     order_id: int,
@@ -921,7 +924,7 @@ def update_order_status(
 
 @router.patch(
     "/{order_id}/delivery",
-    response_model=OrderResponse,
+    response_model=AdminOrderResponse,
 )
 def update_delivery(
     order_id: int,
@@ -969,6 +972,7 @@ def confirm_payment(
     payment_method: str,
     transaction_id: str,
     background_tasks: BackgroundTasks | None = None,
+    commit: bool = True,
 ):
     """
     Real Payme / Click callbackidan keyin ishlatiladi.
@@ -1155,7 +1159,8 @@ def confirm_payment(
             note=f"{payment_method} callback orqali tasdiqlandi.",
         ))
 
-        db.commit()
+        if commit:
+            db.commit()
 
     except Exception:
         db.rollback()

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import base64
 import json
 import os
+import secrets
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,6 +28,74 @@ class TelegramIdentity:
     username: str | None = None
 
 
+SESSION_TTL_SECONDS = 12 * 60 * 60
+
+
+def _session_ttl_seconds() -> int:
+    try:
+        ttl = int(os.getenv("MINI_APP_SESSION_TTL_SECONDS", str(SESSION_TTL_SECONDS)))
+    except ValueError:
+        raise HTTPException(status_code=503, detail="Mini App sessiya muddati noto'g'ri sozlangan.") from None
+    if not 300 <= ttl <= 24 * 60 * 60:
+        raise HTTPException(status_code=503, detail="Mini App sessiya muddati 300 soniya va 24 soat oralig'ida bo'lishi kerak.")
+    return ttl
+
+
+def _session_secret() -> bytes:
+    bot_token = os.getenv("BOT_TOKEN", "").strip()
+    if not bot_token:
+        raise HTTPException(status_code=503, detail="Telegram sessiya kaliti sozlanmagan.")
+    return hmac.new(bot_token.encode(), b"adrenalin-mini-app-session-v1", hashlib.sha256).digest()
+
+
+def _b64(value: bytes) -> str:
+    return base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
+
+
+def create_session_token(identity: TelegramIdentity) -> tuple[str, int]:
+    """Exchange freshly verified Telegram initData for an in-memory API token."""
+    now = int(time.time())
+    ttl = _session_ttl_seconds()
+    payload = {
+        "sub": identity.telegram_id,
+        "first_name": identity.first_name,
+        "username": identity.username,
+        "iat": now,
+        "exp": now + ttl,
+        "nonce": secrets.token_urlsafe(12),
+    }
+    encoded = _b64(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
+    signature = _b64(hmac.new(_session_secret(), encoded.encode("ascii"), hashlib.sha256).digest())
+    return f"{encoded}.{signature}", ttl
+
+
+def verify_session_token(token: str) -> TelegramIdentity:
+    if not token or len(token) > 4096 or token.count(".") != 1:
+        raise _unauthorized("Mini App sessiyasi yaroqsiz. Ilovani qayta oching.")
+    encoded, supplied_signature = token.split(".", 1)
+    expected_signature = _b64(hmac.new(_session_secret(), encoded.encode("ascii"), hashlib.sha256).digest())
+    if not hmac.compare_digest(expected_signature, supplied_signature):
+        raise _unauthorized("Mini App sessiyasi yaroqsiz. Ilovani qayta oching.")
+    try:
+        padding = "=" * (-len(encoded) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(encoded + padding))
+        telegram_id = int(payload["sub"])
+        issued_at = int(payload["iat"])
+        expires_at = int(payload["exp"])
+    except (ValueError, TypeError, KeyError, json.JSONDecodeError):
+        raise _unauthorized("Mini App sessiyasi yaroqsiz. Ilovani qayta oching.") from None
+    now = int(time.time())
+    if telegram_id <= 0 or issued_at > now + 60 or expires_at <= now or expires_at - issued_at > _session_ttl_seconds():
+        raise _unauthorized("Mini App sessiyasi eskirgan. Ilovani qayta oching.")
+    first_name = payload.get("first_name")
+    username = payload.get("username")
+    return TelegramIdentity(
+        telegram_id=telegram_id,
+        first_name=first_name if isinstance(first_name, str) else None,
+        username=username if isinstance(username, str) else None,
+    )
+
+
 def _unauthorized(detail: str = "Telegram Mini App orqali qayta kiring.") -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -37,6 +107,10 @@ def _unauthorized(detail: str = "Telegram Mini App orqali qayta kiring.") -> HTT
 def verify_telegram_init_data(init_data: str) -> TelegramIdentity:
     """Verify Telegram WebApp initData using the official HMAC procedure."""
 
+    # Avoid spending CPU and allocating unbounded strings on hostile headers.
+    if not init_data or len(init_data) > 16_384:
+        raise _unauthorized("Telegram initData formati noto'g'ri.")
+
     bot_token = os.getenv("BOT_TOKEN", "").strip()
     if not bot_token:
         raise HTTPException(
@@ -45,7 +119,12 @@ def verify_telegram_init_data(init_data: str) -> TelegramIdentity:
         )
 
     try:
-        pairs = parse_qsl(init_data, keep_blank_values=True, strict_parsing=True)
+        pairs = parse_qsl(
+            init_data,
+            keep_blank_values=True,
+            strict_parsing=True,
+            max_num_fields=64,
+        )
         values = dict(pairs)
         supplied_hash = values.pop("hash")
         auth_date = int(values["auth_date"])
@@ -72,9 +151,14 @@ def verify_telegram_init_data(init_data: str) -> TelegramIdentity:
     if not hmac.compare_digest(expected_hash, supplied_hash):
         raise _unauthorized("Telegram imzosi tasdiqlanmadi.")
 
-    max_age = int(os.getenv("TELEGRAM_INIT_DATA_MAX_AGE_SECONDS", "86400"))
+    try:
+        max_age = int(os.getenv("TELEGRAM_INIT_DATA_MAX_AGE_SECONDS", "300"))
+    except ValueError:
+        raise HTTPException(status_code=503, detail="Telegram autentifikatsiyasi noto'g'ri sozlangan.") from None
+    if max_age < 1 or max_age > 300:
+        raise HTTPException(status_code=503, detail="Telegram initData muddati 300 soniyadan oshmasligi kerak.")
     now = int(time.time())
-    if auth_date > now + 30 or now - auth_date > max_age:
+    if auth_date > now or now - auth_date > max_age:
         raise _unauthorized("Telegram sessiyasi eskirgan. Ilovani qayta oching.")
 
     try:
@@ -96,11 +180,13 @@ def verify_telegram_init_data(init_data: str) -> TelegramIdentity:
 
 
 def get_current_telegram_user(request: Request) -> TelegramIdentity:
-    """Authenticate the request's `Authorization: tma <initData>` header."""
+    """Authenticate fresh Telegram initData or a short-lived app API token."""
 
     authorization = request.headers.get("authorization", "")
     scheme, separator, init_data = authorization.partition(" ")
     if scheme.lower() != "tma" or not separator or not init_data.strip():
+        if scheme.lower() == "bearer" and separator and init_data.strip():
+            return verify_session_token(init_data.strip())
         raise _unauthorized()
     return verify_telegram_init_data(init_data.strip())
 

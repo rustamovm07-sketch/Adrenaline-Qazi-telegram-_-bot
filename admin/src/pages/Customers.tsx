@@ -9,6 +9,8 @@ import {
   AlertCircle,
   CalendarDays,
   ChevronRight,
+  ExternalLink,
+  MapPin,
   Phone,
   RefreshCw,
   Search,
@@ -24,6 +26,25 @@ import {
   type Customer,
   type CustomerDetails,
 } from '../api/customers'
+import { getStoreSettings } from '../api/storeSettings'
+
+function yandexGoRouteUrl(
+  destination: { latitude: number; longitude: number },
+  origin: { latitude: number; longitude: number } | null,
+) {
+  const query = new URLSearchParams({
+    'end-lat': String(destination.latitude),
+    'end-lon': String(destination.longitude),
+    tariffClass: 'econom',
+    lang: 'uz',
+    appmetrica_tracking_id: '1178268795219780156',
+  })
+  if (origin) {
+    query.set('start-lat', String(origin.latitude))
+    query.set('start-lon', String(origin.longitude))
+  }
+  return `https://3.redirect.appmetrica.yandex.com/route?${query.toString()}`
+}
 
 
 function formatPrice(
@@ -78,6 +99,7 @@ function getStatusClass(status: string) {
 
 
 function Customers() {
+  const [storeCoordinates, setStoreCoordinates] = useState<{ latitude: number; longitude: number } | null>(null)
   const [
     customers,
     setCustomers,
@@ -139,6 +161,11 @@ function Customers() {
     // Initial data is loaded asynchronously from the API.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadCustomers()
+    void getStoreSettings().then((settings) => {
+      if (settings.latitude !== null && settings.longitude !== null) {
+        setStoreCoordinates({ latitude: settings.latitude, longitude: settings.longitude })
+      }
+    }).catch(() => undefined)
   }, [])
 
 
@@ -690,6 +717,12 @@ function Customers() {
               <div className="grid gap-4 md:grid-cols-4">
 
                 <DetailCard
+                  title="Familiya"
+                  value={selectedCustomer.surname || 'Kiritilmagan'}
+                  icon={<User size={18} />}
+                />
+
+                <DetailCard
                   title="Telefon"
                   value={
                     selectedCustomer.phone
@@ -744,6 +777,54 @@ function Customers() {
                 />
 
               </div>
+
+              <section className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-5">
+                <div className="flex items-start gap-3">
+                  <MapPin size={20} className="mt-0.5 shrink-0 text-rose-700" />
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-black text-gray-900">Yetkazish manzili</h3>
+                    <p className="mt-2 break-words text-sm text-gray-700">
+                      {selectedCustomer.address || 'Manzil kiritilmagan'}
+                    </p>
+                    <p className="mt-1 break-words text-sm text-gray-500">
+                      Mo‘ljal: {selectedCustomer.landmark || 'Kiritilmagan'}
+                    </p>
+                    {selectedCustomer.latitude !== null && selectedCustomer.longitude !== null ? (
+                      <>
+                        <p className="mt-2 text-xs text-gray-500">
+                          {selectedCustomer.latitude.toFixed(6)}, {selectedCustomer.longitude.toFixed(6)}
+                          {selectedCustomer.accuracy !== null && selectedCustomer.accuracy !== undefined
+                            ? ` · aniqlik ±${Math.round(selectedCustomer.accuracy)} m`
+                            : ''}
+                        </p>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <a
+                            href={yandexGoRouteUrl(
+                              { latitude: selectedCustomer.latitude, longitude: selectedCustomer.longitude },
+                              storeCoordinates,
+                            )}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#7A1028] px-4 py-2 text-sm font-bold text-white hover:bg-[#5d0b1e]"
+                          >
+                            <ExternalLink size={16} /> Yandex Go’da yo‘nalishni ochish
+                          </a>
+                          <a
+                            href={`https://www.openstreetmap.org/?mlat=${selectedCustomer.latitude}&mlon=${selectedCustomer.longitude}#map=17/${selectedCustomer.latitude}/${selectedCustomer.longitude}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-bold text-gray-800"
+                          >
+                            <MapPin size={16} /> Xaritada ko‘rish
+                          </a>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="mt-2 text-sm text-amber-700">Lokatsiya kiritilmagan.</p>
+                    )}
+                  </div>
+                </div>
+              </section>
 
 
               {/* DEBT */}

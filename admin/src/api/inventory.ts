@@ -1,6 +1,6 @@
 import { apiFetch } from './http'
 
-const API_URL = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
+const API_URL = (import.meta.env.VITE_API_URL || window.location.origin).replace(/\/$/, '')
 
 export type InventoryMovement = {
   id: number

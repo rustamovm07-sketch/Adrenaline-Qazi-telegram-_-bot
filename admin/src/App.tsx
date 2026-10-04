@@ -13,6 +13,7 @@ import {
   Users,
   X,
   Warehouse,
+  CreditCard,
 } from 'lucide-react'
 
 import Categories from './pages/Categories'
@@ -20,15 +21,17 @@ import Customers from './pages/Customers'
 import Dashboard from './pages/Dashboard'
 import Inventory from './pages/Inventory'
 import Orders from './pages/Orders'
+import Payments from './pages/Payments'
 import Products from './pages/Products'
 import Reports from './pages/Reports'
 import SettingsPage from './pages/Settings'
 
-type Page = 'dashboard' | 'orders' | 'products' | 'categories' | 'inventory' | 'customers' | 'reports' | 'settings'
+type Page = 'dashboard' | 'orders' | 'payments' | 'products' | 'categories' | 'inventory' | 'customers' | 'reports' | 'settings'
 
 const menuItems: { id: Page; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'dashboard', label: 'Boshqaruv paneli', icon: LayoutDashboard },
   { id: 'orders', label: 'Buyurtmalar', icon: ClipboardList },
+  { id: 'payments', label: 'To‘lovlar', icon: CreditCard },
   { id: 'products', label: 'Mahsulotlar', icon: Package },
   { id: 'categories', label: 'Kategoriyalar', icon: FolderTree },
   { id: 'inventory', label: 'Ombor', icon: Warehouse },
@@ -40,6 +43,7 @@ const menuItems: { id: Page; label: string; icon: typeof LayoutDashboard }[] = [
 const pages = {
   dashboard: <Dashboard />,
   orders: <Orders />,
+  payments: <Payments />,
   products: <Products />,
   categories: <Categories />,
   inventory: <Inventory />,
